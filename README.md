@@ -50,75 +50,87 @@ src/main/java/edu/eci/arsw/blueprints
 ## 📖 Actividades del laboratorio
 
 ### 1. Familiarización con el código base
-- Revisa el paquete `model` con las clases `Blueprint` y `Point`.  
-- Entiende la capa `persistence` con `InMemoryBlueprintPersistence`.  
-- Analiza la capa `services` (`BlueprintsServices`) y el controlador `BlueprintsAPIController`.
 
-### 2. Migración a persistencia en PostgreSQL
-- Configura una base de datos PostgreSQL (puedes usar Docker).  
-- Implementa un nuevo repositorio `PostgresBlueprintPersistence` que reemplace la versión en memoria.  
-- Mantén el contrato de la interfaz `BlueprintPersistence`.  
+### 1.1 Revisa el paquete `model` con las clases `Blueprint` y `Point`. 
 
-### 3. Buenas prácticas de API REST
-- Cambia el path base de los controladores a `/api/v1/blueprints`.  
-- Usa **códigos HTTP** correctos:  
-  - `200 OK` (consultas exitosas).  
-  - `201 Created` (creación).  
-  - `202 Accepted` (actualizaciones).  
-  - `400 Bad Request` (datos inválidos).  
-  - `404 Not Found` (recurso inexistente).  
-- Implementa una clase genérica de respuesta uniforme:
-  ```java
-  public record ApiResponse<T>(int code, String message, T data) {}
-  ```
-  Ejemplo JSON:
-  ```json
-  {
-    "code": 200,
-    "message": "execute ok",
-    "data": { "author": "john", "name": "house", "points": [...] }
-  }
-  ```
+Estas son las entidades principales que representan los planos y sus puntos. Observa cómo se estructuran y qué atributos tienen.
 
-### 4. OpenAPI / Swagger
-- Configura `springdoc-openapi` en el proyecto.  
-- Expón documentación automática en `/swagger-ui.html`.  
-- Anota endpoints con `@Operation` y `@ApiResponse`.
+**Clase `Point.java`:** 
 
-### 5. Filtros de *Blueprints*
-- Implementa filtros:
-  - **RedundancyFilter**: elimina puntos duplicados consecutivos.  
-  - **UndersamplingFilter**: conserva 1 de cada 2 puntos.  
-- Activa los filtros mediante perfiles de Spring (`redundancy`, `undersampling`).  
+Esta clase usa un Java Record que es una forma concisa de crear clases de datos inmutables. 
 
----
+Automáticamente genera:
 
-## ✅ Entregables
+- Constructor: Point(int x, int y)
+- Getters: x() y y() 
+- equals(): Compara puntos por sus coordenadas
+- hashCode(): Para usar en colecciones
+- toString(): Representación textual "Point[x=1, y=2]"
 
-1. Repositorio en GitHub con:  
-   - Código fuente actualizado.  
-   - Configuración PostgreSQL (`application.yml` o script SQL).  
-   - Swagger/OpenAPI habilitado.  
-   - Clase `ApiResponse<T>` implementada.  
+Características:
 
-2. Documentación:  
-   - Informe de laboratorio con instrucciones claras.  
-   - Evidencia de consultas en Swagger UI y evidencia de mensajes en la base de datos.  
-   - Breve explicación de buenas prácticas aplicadas.  
+- Inmutable: No se pueden cambiar las coordenadas después de crear el punto
+- Validación: Las coordenadas son enteros (int)
+- Uso: Representa una coordenada cartesiana en un plano 2D
 
----
+**Clase `Blueprint.java`:**
 
-## 📊 Criterios de evaluación
+Esta clase representa un plano que tiene un autor, un nombre y una lista de puntos.
 
-| Criterio | Peso |
-|----------|------|
-| Diseño de API (versionamiento, DTOs, ApiResponse) | 25% |
-| Migración a PostgreSQL (repositorio y persistencia correcta) | 25% |
-| Uso correcto de códigos HTTP y control de errores | 20% |
-| Documentación con OpenAPI/Swagger + README | 15% |
-| Pruebas básicas (unitarias o de integración) | 15% |
+Atributos:
 
-**Bonus**:  
+```java
+private String author;        // Autor del plano
+private String name;          // Nombre del plano
+private final List<Point> points = new ArrayList<>();  // Lista de puntos
+```
+- La lista points es final 
+- Se inicializa vacía y se llena en el constructor
 
-- Imagen de contenedor (`spring-boot:build-image`).  
-- Métricas con Actuator.  
+Contructor:
+
+```java
+public Blueprint(String author, String name, List<Point> pts) {
+    this.author = author;
+    this.name = name;
+    if (pts != null) points.addAll(pts);
+} 
+```
+- Recibe el autor, nombre y una lista de puntos
+- Copia los pintos a su propia lista para mantener la inmutabilidad de la referencia
+
+Getters:
+```java
+public String getAuthor() { return author; }
+public String getName() { return name; }
+public List<Point> getPoints() { 
+    return Collections.unmodifiableList(points); 
+}
+```
+- Devuelve el autor, nombre y una lista inmodificable de puntos
+
+Metodo para agregar puntos:
+```java
+public void addPoint(Point p) {
+    points.add(p);
+}
+```
+- Permite agregar un punto al plano
+
+Metodos de identidad e igualdad:
+```java
+@Override
+public boolean equals(Object o) {
+    if (this == o) return true;
+    if (!(o instanceof Blueprint bp)) return false;
+    return Objects.equals(author, bp.author) && 
+           Objects.equals(name, bp.name);
+}
+
+@Override
+public int hashCode() {
+    return Objects.hash(author, name);
+}
+```
+- Dos planos son iguales si tienen el mismo autor y nombre, sin importar los puntos
+- hashCode se basa en autor y nombre para uso en colecciones
