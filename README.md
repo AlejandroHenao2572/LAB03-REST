@@ -268,3 +268,201 @@ public void addPoint(String author, String name, int x, int y) throws BlueprintN
 - Si no existe, getBlueprint() lanzará excepción
 - Si existe, agrega un nuevo punto al blueprint usando su método addPoint()
 
+### 1.3 Analiza la capa services `(BlueprintsServices)` y el controlador `BlueprintsAPIController`.
+
+**Clase `BlueprintsServices.java`:**
+
+Esta clase es la capa de servicios que actúa como intermediaria entre el controlador y la persistencia. Encapsula la lógica de negocio y coordina las operaciones con filtros.
+
+Dependencias:
+```java
+private final BlueprintPersistence persistence;
+private final BlueprintsFilter filter;
+
+public BlueprintsServices(BlueprintPersistence persistence, BlueprintsFilter filter) {
+    this.persistence = persistence;
+    this.filter = filter;
+}
+```
+- `BlueprintPersistence`: Interfaz para acceso a datos
+- `BlueprintsFilter`: Filtro para procesar blueprints al consultarlos
+- Constructor: Inyección por constructor
+
+Métodos de negocio:
+
+**addNewBlueprint(Blueprint bp):**
+```java
+public void addNewBlueprint(Blueprint bp) throws BlueprintPersistenceException {
+    persistence.saveBlueprint(bp);
+}
+```
+- Delega a la capa de datos
+- Propaga la excepción si el blueprint ya existe
+
+**getAllBlueprints():**
+```java
+public Set<Blueprint> getAllBlueprints() {
+    return persistence.getAllBlueprints();
+}
+```
+- Obtiene todos los blueprints sin aplicar filtros
+- Retorna un Set de todos los planos disponibles
+
+**getBlueprintsByAuthor(String author):**
+```java
+public Set<Blueprint> getBlueprintsByAuthor(String author) throws BlueprintNotFoundException {
+    return persistence.getBlueprintsByAuthor(author);
+}
+```
+- Obtiene todos los blueprints de un autor específico
+- No aplica filtros a la colección completa
+- Lanza excepción si el autor no tiene blueprints
+
+**getBlueprint(String author, String name):**
+```java
+public Blueprint getBlueprint(String author, String name) throws BlueprintNotFoundException {
+    return filter.apply(persistence.getBlueprint(author, name));
+}
+```
+- Obtiene un blueprint individual por autor y nombre
+- Aplica el filtro configurado antes de retornarlo
+- El filtro puede modificar los puntos
+- Es el único método que aplica filtros
+
+**addPoint(String author, String name, int x, int y):**
+```java
+public void addPoint(String author, String name, int x, int y) throws BlueprintNotFoundException {
+    persistence.addPoint(author, name, x, y);
+}
+```
+- Agrega un punto a un blueprint existente
+- Delega la operación a la capa de persistencia
+
+---
+
+**Clase `BlueprintsAPIController.java`:**
+
+Esta clase es el controlador REST que expone los endpoints HTTP.
+
+Anotaciones de clase:
+```java
+@RestController
+@RequestMapping("/blueprints")
+```
+- `@RequestMapping("/blueprints")`: Todas las rutas inician con /blueprints
+
+Dependencia:
+```java
+private final BlueprintsServices services;
+
+public BlueprintsAPIController(BlueprintsServices services) { 
+    this.services = services; 
+}
+```
+- Inyecta BlueprintsServices por constructor
+- Delega toda la lógica al servicio
+
+Endpoints REST:
+
+**1. GET /blueprints**
+```java
+@GetMapping
+public ResponseEntity<Set<Blueprint>> getAll() {
+    return ResponseEntity.ok(services.getAllBlueprints());
+}
+```
+- Retorna todos los blueprints del sistema
+- Código HTTP: 200 OK
+
+**2. GET /blueprints/{author}**
+```java
+@GetMapping("/{author}")
+public ResponseEntity<?> byAuthor(@PathVariable String author) {
+    try {
+        return ResponseEntity.ok(services.getBlueprintsByAuthor(author));
+    } catch (BlueprintNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                             .body(Map.of("error", e.getMessage()));
+    }
+}
+```
+- `@PathVariable`: Extrae el autor de la URL
+- Si existe: Retorna Set de blueprints con 200 OK
+- Si no existe: Retorna 404 NOT_FOUND
+- Formato de error: `{"error": "mensaje"}`
+
+**3. GET /blueprints/{author}/{bpname}**
+```java
+@GetMapping("/{author}/{bpname}")
+public ResponseEntity<?> byAuthorAndName(@PathVariable String author, @PathVariable String bpname) {
+    try {
+        return ResponseEntity.ok(services.getBlueprint(author, bpname));
+    } catch (BlueprintNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                             .body(Map.of("error", e.getMessage()));
+    }
+}
+```
+- Obtiene un blueprint específico
+- Dos parámetros de ruta: author y bpname
+- Si existe: 200 OK con el blueprint
+- Si no existe: 404 NOT_FOUND con mensaje de error
+
+**4. POST /blueprints**
+```java
+@PostMapping
+public ResponseEntity<?> add(@Valid @RequestBody NewBlueprintRequest req) {
+    try {
+        Blueprint bp = new Blueprint(req.author(), req.name(), req.points());
+        services.addNewBlueprint(bp);
+        return ResponseEntity.status(HttpStatus.CREATED).build();
+    } catch (BlueprintPersistenceException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                             .body(Map.of("error", e.getMessage()));
+    }
+}
+```
+- Crea un nuevo blueprint desde el request
+- Si es exitoso: 201 CREATED
+- Si ya existe: 403 FORBIDDEN con mensaje de error
+
+**5. PUT /blueprints/{author}/{bpname}/points**
+```java
+@PutMapping("/{author}/{bpname}/points")
+public ResponseEntity<?> addPoint(@PathVariable String author, @PathVariable String bpname,
+                                  @RequestBody Point p) {
+    try {
+        services.addPoint(author, bpname, p.x(), p.y());
+        return ResponseEntity.status(HttpStatus.ACCEPTED).build();
+    } catch (BlueprintNotFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                             .body(Map.of("error", e.getMessage()));
+    }
+}
+```
+- Agrega un punto a un blueprint existente
+- Recibe Point en el body JSON: `{"x":3, "y":3}`
+- Si existe: 202 ACCEPTED
+- Si no existe: 404 NOT_FOUND
+
+**DTO - NewBlueprintRequest:**
+```java
+public record NewBlueprintRequest(
+        @NotBlank String author,
+        @NotBlank String name,
+        @Valid java.util.List<Point> points
+) { }
+```
+- Record de Java para request de creación
+- `@NotBlank`: Valida que author y name no estén vacíos
+- `@Valid`: Valida cada Point de la lista
+- Se usa solo en el POST
+
+Códigos HTTP utilizados:
+- **200 OK**: Consultas exitosas (GET)
+- **201 CREATED**: Recurso creado exitosamente (POST)
+- **202 ACCEPTED**: Actualización aceptada (PUT)
+- **403 FORBIDDEN**: Blueprint ya existe (POST con duplicado)
+- **404 NOT_FOUND**: Recurso no encontrado (GET/PUT fallidos)
+
+
