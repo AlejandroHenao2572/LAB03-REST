@@ -739,4 +739,45 @@ public class GlobalExceptionHandler {
 | **409 CONFLICT** | Recurso duplicado | POST con blueprint existente |
 | **500 INTERNAL SERVER ERROR** | Error del servidor | Excepciones no controladas |
 
+## 4. OpenAPI / Swagger
 
+### Verificar dependencias
+```
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    <version>2.6.0</version>
+</dependency>
+```
+
+### Configuracion de OpenApi
+```
+@Configuration
+public class OpenApiConfig {
+    @Bean
+    public OpenAPI api() {
+        return new OpenAPI().info(new Info()
+                .title("ARSW Blueprints API")
+                .version("v1")
+                .description("Blueprints Laboratory (Java 21 / Spring Boot 3.3.x)"));
+    }
+}
+```
+
+### Acceder a la documentacion:
+```
+http://localhost:8080/swagger-ui.html
+```
+
+### Anotar endpoints con @Operation y @ApiResponse
+
+Al acceder a swagger:
+
+- Título y descripción del API (de OpenApiConfig)
+- Agrupación por tags ("Blueprints")
+- Cada endpoint con:
+  - Summary y descripción
+  - Parámetros documentados
+  - Ejemplos de request/response
+  - Códigos HTTP posibles
+  - Botón "Try it out" para probar
