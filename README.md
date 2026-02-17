@@ -467,7 +467,7 @@ Códigos HTTP utilizados:
 
 ## 2. Migración a persistencia en PostgreSQL
 
-### 1.2 Configura una base de datos PostgreSQL usando Docker.
+### 2.1 Configura una base de datos PostgreSQL usando Docker.
 
 - `docker-compose.yml` en la raiz del proyecto
 
@@ -523,9 +523,9 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 ```
 
 
-### 1.3 Implementa un nuevo repositorio PostgresBlueprintPersistence que reemplace la versión en memoria.
+### 2.2 Implementa un nuevo repositorio PostgresBlueprintPersistence que reemplace la versión en memoria mantiendo el contrato con `BlueprintPersistence`.
 
-#### **Paso 1: Convertir las clases del modelo en entidades JPA**
+### **Convertir las clases del modelo en entidades JPA:**
 
 Se crearon versiones JPA de las clases del modelo para permitir su persistencia en PostgreSQL:
 
@@ -543,4 +543,113 @@ Se crearon versiones JPA de las clases del modelo para permitir su persistencia 
 - `@CollectionTable(name = "points")`: Puntos se guardan en tabla separada con FK a blueprint_id
 - Constructor vacío requerido por JPA
 
+### **Crear el repositorio:**
+
+```java
+@Repository
+public interface BlueprintRepository extends JpaRepository<Blueprint, Long> {
+    Optional<Blueprint> findByAuthorAndName(String author, String name);
+    List<Blueprint> findByAuthor(String author);
+    boolean existsByAuthorAndName(String author, String name);
+}
+```
+- Spring genera el SQL automáticamente basándose en los nombres
+
+### **Implementar PostgresBlueprintPersistence**
+
+Esta clase implementa la interfaz `BlueprintPersistence` utilizando JPA para persistir datos en PostgreSQL, manteniendo el mismo contrato que `InMemoryBlueprintPersistence`.
+
+```java
+@Repository
+@Primary //Prioridad sobre InMemoryBlueprintPersistence
+public class PostgresBlueprintPersistence implements BlueprintPersistence {
+    
+    private final BlueprintRepository repository;
+    
+    public PostgresBlueprintPersistence(BlueprintRepository repository) {
+        this.repository = repository;
+    }
+    
+    // Implementación de todos los métodos...
+}
+```
+- `@Repository`: Marca como componente de persistencia de Spring
+- `@Primary`: Indica que esta implementación tiene prioridad al inyectar `BlueprintPersistence`
+
+**Implementación de métodos respetando el contrato:**
+
+**1. saveBlueprint(Blueprint bp):**
+```java
+@Override
+public void saveBlueprint(Blueprint bp) throws BlueprintPersistenceException {
+    if (repository.existsByAuthorAndName(bp.getAuthor(), bp.getName())) {
+        throw new BlueprintPersistenceException(
+            "Blueprint already exists: " + bp.getAuthor() + ":" + bp.getName()
+        );
+    }
+    repository.save(bp);
+}
+```
+- Verifica duplicados usando `existsByAuthorAndName()`
+- Lanza `BlueprintPersistenceException` si ya existe (mismo comportamiento que InMemory)
+- Guarda usando `repository.save()`
+
+**2. getBlueprint(String author, String name):**
+```java
+@Override
+public Blueprint getBlueprint(String author, String name) 
+        throws BlueprintNotFoundException {
+    return repository.findByAuthorAndName(author, name)
+        .orElseThrow(() -> new BlueprintNotFoundException(
+            "Blueprint not found: %s/%s".formatted(author, name)
+        ));
+}
+```
+- Usa `findByAuthorAndName()` que retorna `Optional<Blueprint>`
+- `.orElseThrow()`: Si el Optional está vacio, lanza `BlueprintNotFoundException`
+- Mantiene el mismo comportamiento de excepcion que la version en memoria
+
+**3. getBlueprintsByAuthor(String author):**
+```java
+@Override
+public Set<Blueprint> getBlueprintsByAuthor(String author) 
+        throws BlueprintNotFoundException {
+    List<Blueprint> blueprints = repository.findByAuthor(author);
+    
+    if (blueprints.isEmpty()) {
+        throw new BlueprintNotFoundException(
+            "No blueprints for author: " + author
+        );
+    }
+    
+    return new HashSet<>(blueprints);
+}
+```
+- Obtiene lista de blueprints del autor
+- Valida que no esté vacía (mismo comportamiento que InMemory)
+- Convierte `List` a `Set` para cumplir con el tipo de retorno del contrato
+
+**4. getAllBlueprints():**
+```java
+@Override
+public Set<Blueprint> getAllBlueprints() {
+    return new HashSet<>(repository.findAll());
+}
+```
+- Usa `findAll()` de JpaRepository
+- Convierte a `Set` para mantener el contrato
+
+**5. addPoint(String author, String name, int x, int y):**
+```java
+@Override
+public void addPoint(String author, String name, int x, int y) 
+        throws BlueprintNotFoundException {
+    Blueprint bp = getBlueprint(author, name);
+    bp.addPoint(new Point(x, y));
+    repository.save(bp);
+}
+```
+- Obtiene el blueprint (si no existe, `getBlueprint()` lanza excepción)
+- Agrega el punto a la lista interna del blueprint
+- `repository.save()`: JPA detecta los cambios y actualiza automáticamente en la BD
 
