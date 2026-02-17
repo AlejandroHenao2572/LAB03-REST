@@ -653,3 +653,90 @@ public void addPoint(String author, String name, int x, int y)
 - Agrega el punto a la lista interna del blueprint
 - `repository.save()`: JPA detecta los cambios y actualiza automáticamente en la BD
 
+## 3. Buenas prácticas de API REST
+
+### Versionado de API
+
+Se cambió el path base a `/api/v1/blueprints`:
+
+```java
+@RestController
+@RequestMapping("api/v1/blueprints")
+public class BlueprintsAPIController { ... }
+```
+
+### Respuestas uniformes con ApiResponse
+
+Se implementó una clase genérica para estandarizar todas las respuestas:
+
+```java
+public record ApiResponse<T>(int code, String message, T data) {   
+    public static <T> ApiResponse<T> success(String message, T data) {
+        return new ApiResponse<>(200, message, data);
+    }
+    public static <T> ApiResponse<T> created(String message, T data) {
+        return new ApiResponse<>(201, message, data);
+    }
+    public static <T> ApiResponse<T> updated(String message, T data) {
+        return new ApiResponse<>(202, message, data);
+    }
+    public static <T> ApiResponse<T> error(int code, String message) {
+        return new ApiResponse<>(code, message, null);
+    }
+}
+```
+
+**Formato de respuesta:**
+
+```json
+{
+  "code": 200,
+  "message": "Blueprint retrieved successfully",
+  "data": {
+    "author": "john",
+    "name": "house",
+    "points": [{"x": 0, "y": 0}]
+  }
+}
+```
+
+### Manejo centralizado de excepciones
+
+Se implementó `GlobalExceptionHandler`para capturar todas las excepciones:
+
+```java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+    
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<?>> handleValidationErrors(...) {
+        // Retorna 400 BAD REQUEST para errores de validación
+    }
+    @ExceptionHandler(BlueprintNotFoundException.class)
+    public ResponseEntity<ApiResponse<?>> handleBlueprintNotFound(...) {
+        // Retorna 404 NOT FOUND
+    }
+    @ExceptionHandler(BlueprintPersistenceException.class)
+    public ResponseEntity<ApiResponse<?>> handleBlueprintPersistence(...) {
+        // Retorna 409 CONFLICT para duplicados
+    }
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<?>> handleGenericException(...) {
+        // Retorna 500 INTERNAL SERVER ERROR
+    }
+}
+```
+
+### Codigos HTTP implementados
+
+| Código | Uso | Endpoint |
+|--------|-----|----------|
+| **200 OK** | Consultas exitosas | GET todos los endpoints |
+| **201 CREATED** | Recurso creado | POST /blueprints |
+| **202 ACCEPTED** | Actualización aceptada | PUT /blueprints/{author}/{name}/points |
+| **400 BAD REQUEST** | Datos inválidos (validación) | POST con datos incorrectos |
+| **404 NOT FOUND** | Recurso no encontrado | GET/PUT con recurso inexistente |
+| **409 CONFLICT** | Recurso duplicado | POST con blueprint existente |
+| **500 INTERNAL SERVER ERROR** | Error del servidor | Excepciones no controladas |
+
+
