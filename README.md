@@ -525,4 +525,22 @@ spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
 
 ### 1.3 Implementa un nuevo repositorio PostgresBlueprintPersistence que reemplace la versión en memoria.
 
-### 1.4 Mantén el contrato de la interfaz BlueprintPersistence.
+#### **Paso 1: Convertir las clases del modelo en entidades JPA**
+
+Se crearon versiones JPA de las clases del modelo para permitir su persistencia en PostgreSQL:
+
+**PointJPA.java:**
+- Convertida de `record` a clase regular con `@Embeddable`
+- Se incrusta directamente en la tabla de puntos (no tiene tabla propia)
+- Constructor vacío requerido por JPA
+- Mantiene compatibilidad con métodos `x()` y `y()`
+
+**BlueprintJPA.java:**
+- Anotada con `@Entity` para mapearla a tabla "blueprints"
+- `@Id` + `@GeneratedValue(IDENTITY)`: Clave primaria auto-incremental
+- `@UniqueConstraint(columnNames = {"author", "name"})`: Evita duplicados
+- `@ElementCollection(fetch = EAGER)`: Lista de puntos cargada automáticamente
+- `@CollectionTable(name = "points")`: Puntos se guardan en tabla separada con FK a blueprint_id
+- Constructor vacío requerido por JPA
+
+

@@ -7,7 +7,7 @@ import java.util.Objects;
 
 public class Blueprint {
 
-    private String author;
+    String author;
     private String name;
     private final List<Point> points = new ArrayList<>();
 
