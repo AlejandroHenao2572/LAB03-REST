@@ -929,3 +929,64 @@ Error 404 Blueprint no Encontrado:
 
 404 No existe:
 ![alt text](img/b.png)
+
+## Pruebas Unitarias
+
+Se implementaron 46 pruebas unitarias y de integración para garantizar el correcto funcionamiento de todas las capas del sistema.
+
+### Estructura de pruebas
+
+**1. BlueprintsAPITest (12 pruebas)** - Pruebas de integración del API REST
+- GET `/api/v1/blueprints` - Obtener todos los blueprints
+- GET `/api/v1/blueprints/{author}` - Obtener por autor (éxito y error 404)
+- GET `/api/v1/blueprints/{author}/{name}` - Obtener blueprint específico (éxito y error 404)
+- POST `/api/v1/blueprints` - Crear blueprint (éxito, duplicado 409, datos inválidos 400)
+- PUT `/api/v1/blueprints/{author}/{name}/points` - Agregar punto (éxito 202 y error 404)
+- Flujos completos: Crear → Consultar, Crear → Agregar punto → Verificar
+
+**2. BlueprintsServicesTest (10 pruebas)** - Capa de servicios
+- Agregar blueprints nuevos y detectar duplicados
+- Obtener todos los blueprints
+- Obtener por autor (existente y no existente)
+- Obtener blueprint específico (existente y no existente)
+- Agregar puntos y verificar coordenadas
+
+**3. BlueprintPersistenceTest (12 pruebas)** - Persistencia en memoria
+- Guardar blueprints (éxito y duplicados)
+- Obtener por autor y nombre (éxito y no encontrado)
+- Obtener todos los blueprints
+- Agregar puntos a blueprints existentes
+- Verificar datos iniciales
+- Mismo nombre con diferentes autores
+
+**4. BlueprintFiltersTest (12 pruebas)** - Filtros de procesamiento
+- IdentityFilter: No modifica el blueprint
+- RedundancyFilter: Elimina puntos duplicados consecutivos
+- UndersamplingFilter: Reduce puntos a la mitad 
+- Casos especiales: blueprints vacíos, un solo punto, números pares/impares
+
+### Ejecución de pruebas
+
+```bash
+# Ejecutar todas las pruebas
+mvn test
+
+# Ejecutar con reporte detallado
+mvn clean test
+
+```
+
+### Resultados
+
+```
+[INFO] Tests run: 46, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+```
+
+Todas las pruebas validan:
+- Códigos HTTP correctos (200, 201, 202, 400, 404, 409)
+- Manejo de excepciones
+- Validación de datos
+- Integridad de operaciones CRUD
+- Funcionamiento de filtros
+- Respuestas con formato ApiResponse uniforme
