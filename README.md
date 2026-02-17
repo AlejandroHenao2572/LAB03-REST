@@ -884,3 +884,45 @@ spring.profiles.active=redundancy
 
 - Con UndersamplinFilter:
 ![alt text](img/undersampling.png)
+
+### Evidencia de uso con Swagger y base de datos
+
+### POST /api/vi/blueprints - Crear Blueprint:  
+![alt text](img/post.png)  
+
+201 Created:
+![alt text](img/postr.png)  
+
+Error 400 datos invalidos:
+![alt text](img/error.png)
+
+Error 409 duplicado:
+![alt text](img/duplicado.png)
+
+Evindecia DB:
+![alt text](img/database.png)
+
+### GET /api/vi/blueprints - Obtener todos los bp:  
+200 OK:
+![alt text](img/image-1.png)  
+
+### GET /api/vi/blueprints - Obtener bp por autor:  
+200 OK:
+![alt text](img/get.png)
+
+Error 404 Autor No Encontrado:
+![alt text](img/nooo.png)
+
+### GET /api/vi/blueprints/{author}/{bpname} - Obtener bp especifico
+200 OK (sin filtros):
+![alt text](img/get2.png)
+
+Error 404 Blueprint no Encontrado:
+![alt text](img/4040.png)
+
+### PUT /api/vi/blueprints/{author}/{bpname}/points - Agregar un punto a un bp
+202 Updated:
+![alt text](img/a.png)
+
+404 No existe:
+![alt text](img/b.png)
