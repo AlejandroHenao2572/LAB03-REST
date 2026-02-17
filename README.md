@@ -465,4 +465,64 @@ Códigos HTTP utilizados:
 - **403 FORBIDDEN**: Blueprint ya existe (POST con duplicado)
 - **404 NOT_FOUND**: Recurso no encontrado (GET/PUT fallidos)
 
+## 2. Migración a persistencia en PostgreSQL
 
+### 1.2 Configura una base de datos PostgreSQL usando Docker.
+
+- `docker-compose.yml` en la raiz del proyecto
+
+```yml
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16
+    container_name: blueprints-postgres
+    environment:
+      POSTGRES_DB: blueprintsdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
+```
+- Ejecucion(tener Docker desktop instalado y abierto previamiente):
+
+```bash
+docker-compose up -d
+```
+
+- Dependencias necesarias en `pom.xml`
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-data-jpa</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.postgresql</groupId>
+    <artifactId>postgresql</artifactId>
+    <scope>runtime</scope>
+</dependency>
+```
+
+- Configuracion de `appication.properties`
+
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/blueprintsdb
+spring.datasource.username=postgres
+spring.datasource.password=postgres
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+```
+
+
+### 1.3 Implementa un nuevo repositorio PostgresBlueprintPersistence que reemplace la versión en memoria.
+
+### 1.4 Mantén el contrato de la interfaz BlueprintPersistence.
