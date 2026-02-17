@@ -25,6 +25,7 @@ import java.util.Set;
  * Todas las excepciones son manejadas por GlobalExceptionHandler
  * Endpoints base: /api/v1/blueprints
  */
+@Tag(name = "Blueprints", description = "API para gestión de blueprints (planos)")
 @RestController
 @RequestMapping("api/v1/blueprints")
 public class BlueprintsAPIController {
@@ -64,7 +65,7 @@ public class BlueprintsAPIController {
 
     @Operation(
         summary = "Obtener blueprints por autor",
-        description = "Retorna la lista de los blueprints de un autor"
+        description = "Retorna todos los blueprints creados por un autor específico"
     )
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
@@ -77,7 +78,7 @@ public class BlueprintsAPIController {
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "404",
-            description = "Autor no encontrado",
+            description = "Autor no encontrado o sin blueprints",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = Object.class)
@@ -91,7 +92,9 @@ public class BlueprintsAPIController {
      * @throws BlueprintNotFoundException si el autor no tiene blueprints (manejado por GlobalExceptionHandler)
      */
     @GetMapping("/{author}")
-    public ResponseEntity<ApiResponse<Set<Blueprint>>> byAuthor(@PathVariable String author) 
+    public ResponseEntity<ApiResponse<Set<Blueprint>>> byAuthor(
+            @Parameter(description = "Nombre del autor del blueprint", required = true, example = "john_doe")
+            @PathVariable String author) 
             throws BlueprintNotFoundException {
         Set<Blueprint> blueprints = services.getBlueprintsByAuthor(author);
         return ResponseEntity.ok(
@@ -100,13 +103,13 @@ public class BlueprintsAPIController {
     }
 
     @Operation(
-        summary = "Obtener blueprints especifico",
-        description = "Retorna la lista de los blueprints de un autor"
+        summary = "Obtener blueprint específico",
+        description = "Retorna un blueprint específico identificado por autor y nombre"
     )
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "200",
-            description = "Blueprint encontrado",
+            description = "Blueprint encontrado exitosamente",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = Object.class)
@@ -114,7 +117,11 @@ public class BlueprintsAPIController {
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "404",
-            description = "Blueprint no encontrado"
+            description = "Blueprint no encontrado",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = Object.class)
+            )
         )
     })
     /**
@@ -126,9 +133,9 @@ public class BlueprintsAPIController {
      */
     @GetMapping("/{author}/{bpname}")
     public ResponseEntity<ApiResponse<Blueprint>> byAuthorAndName(
-            @Parameter(description = "Nombre del autor", required = true)
+            @Parameter(description = "Nombre del autor del blueprint", required = true, example = "john_doe")
             @PathVariable String author,
-            @Parameter(description = "Nombre del blueprint", required = true) 
+            @Parameter(description = "Nombre del blueprint", required = true, example = "house_plan") 
             @PathVariable String bpname) throws BlueprintNotFoundException {
         Blueprint bp = services.getBlueprint(author, bpname);
         return ResponseEntity.ok(
@@ -138,12 +145,12 @@ public class BlueprintsAPIController {
 
     @Operation(
         summary = "Crear un nuevo blueprint",
-        description = "Crea un nuevo blueprint con autor, nombre y puntos"
+        description = "Crea un nuevo blueprint con autor, nombre y lista de puntos. El autor y nombre deben ser únicos."
     )
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "200",
-            description = "Blueprint creado",
+            responseCode = "201",
+            description = "Blueprint creado exitosamente",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = Object.class)
@@ -151,11 +158,19 @@ public class BlueprintsAPIController {
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "400",
-            description = "Datos invalidos"
+            description = "Datos inválidos - autor o nombre vacíos",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = Object.class)
+            )
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "409",
-            description = "Blueprint ya existente"
+            description = "Blueprint ya existente - combinación autor/nombre duplicada",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = Object.class)
+            )
         )
     })
     /**
@@ -183,12 +198,12 @@ public class BlueprintsAPIController {
 
     @Operation(
         summary = "Agregar punto a blueprint",
-        description = "Agrega un nuevo punto a un blueprint existente"
+        description = "Agrega un nuevo punto (coordenada x,y) a un blueprint existente"
     )
     @ApiResponses(value = {
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
-            responseCode = "200",
-            description = "Punto agregado exitosamente",
+            responseCode = "202",
+            description = "Punto agregado exitosamente - Blueprint actualizado",
             content = @Content(
                 mediaType = "application/json",
                 schema = @Schema(implementation = ApiResponse.class)
@@ -196,7 +211,11 @@ public class BlueprintsAPIController {
         ),
         @io.swagger.v3.oas.annotations.responses.ApiResponse(
             responseCode = "404",
-            description = "Blueprint no encontrado"
+            description = "Blueprint no encontrado",
+            content = @Content(
+                mediaType = "application/json",
+                schema = @Schema(implementation = Object.class)
+            )
         )
     })
     /**
@@ -204,25 +223,28 @@ public class BlueprintsAPIController {
      * @param author Nombre del autor
      * @param bpname Nombre del blueprint
      * @param p Punto a agregar
-     * @return 202 Acepted con el blueprint actualizado
+     * @return 202 Accepted con el blueprint actualizado
      * @throws BlueprintNotFoundException si no existe (manejado por GlobalExceptionHandler)
      */
     @PutMapping("/{author}/{bpname}/points")
     public ResponseEntity<ApiResponse<Blueprint>> addPoint(
-            @Parameter(description = "Nombre del autor", required = true)
+            @Parameter(description = "Nombre del autor del blueprint", required = true, example = "john_doe")
             @PathVariable String author,
-            @Parameter(description = "Nombre del blueprint", required = true)
+            @Parameter(description = "Nombre del blueprint", required = true, example = "house_plan")
             @PathVariable String bpname,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                description = "Punto a agregar (x, y)",
-                required = true
+                description = "Punto a agregar con coordenadas x e y",
+                required = true,
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = Point.class)
+                )
             )
             @RequestBody Point p) throws BlueprintNotFoundException {
         services.addPoint(author, bpname, p.x(), p.y());
         Blueprint updated = services.getBlueprint(author, bpname);
-        return ResponseEntity.ok(
-            ApiResponse.updated("Point added successfully", updated)
-        );
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+            .body(ApiResponse.updated("Point added successfully", updated));
     }
 
     /**

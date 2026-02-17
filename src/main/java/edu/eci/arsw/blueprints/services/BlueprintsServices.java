@@ -13,7 +13,7 @@ import java.util.Set;
 public class BlueprintsServices {
 
     private final BlueprintPersistence persistence;
-    private final BlueprintsFilter filter;
+    private final BlueprintsFilter filter; //Inyecion del filtro segun el perfil activo
 
     public BlueprintsServices(BlueprintPersistence persistence, BlueprintsFilter filter) {
         this.persistence = persistence;
@@ -33,6 +33,7 @@ public class BlueprintsServices {
     }
 
     public Blueprint getBlueprint(String author, String name) throws BlueprintNotFoundException {
+        //Aplica el filtro antes de devolver
         return filter.apply(persistence.getBlueprint(author, name));
     }
 

@@ -19,9 +19,12 @@ public class RedundancyFilter implements BlueprintsFilter {
     public Blueprint apply(Blueprint bp) {
         List<Point> in = bp.getPoints();
         if (in.isEmpty()) return bp;
+
         List<Point> out = new ArrayList<>();
         Point prev = null;
+
         for (Point p : in) {
+            // Solo lo agrega si es diferente al anterior
             if (prev == null || !(prev.x()==p.x() && prev.y()==p.y())) {
                 out.add(p);
                 prev = p;

@@ -773,7 +773,7 @@ http://localhost:8080/swagger-ui.html
 
 Al acceder a swagger:
 
-- Título y descripción del API (de OpenApiConfig)
+- Título y descripción del API
 - Agrupación por tags ("Blueprints")
 - Cada endpoint con:
   - Summary y descripción
@@ -781,3 +781,106 @@ Al acceder a swagger:
   - Ejemplos de request/response
   - Códigos HTTP posibles
   - Botón "Try it out" para probar
+
+![alt text](img/swagger.png)
+
+## 5. Filtros de Blueprints
+
+El sistema utiliza inyenccion de dependicias para la funcionalidad de filtros:
+
+**BlueprintsFilter (interfaz):** 
+- **IdentityFilter (@Profile("!redundancy & !undersampling") sin perfil - por defecto)**
+- **RedundancyFilter (@Profile("redundancy"))** 
+- **UndersamplingFilter (@Profile("undersampling"))**
+
+### RedundancyFilter: elimina puntos duplicados consecutivos.
+```java
+@Component
+@Profile("redundancy")
+public class RedundancyFilter implements BlueprintsFilter {
+    @Override
+    public Blueprint apply(Blueprint bp) {
+        List<Point> in = bp.getPoints();
+        if (in.isEmpty()) return bp;
+        List<Point> out = new ArrayList<>();
+        Point prev = null;
+        for (Point p : in) {
+            // Solo agrega si es diferente al anterior
+            if (prev == null || !(prev.x()==p.x() && prev.y()==p.y())) {
+                out.add(p);
+                prev = p;
+            }
+        }
+        return new Blueprint(bp.getAuthor(), bp.getName(), out);
+    }
+}
+```
+
+### UndersamplingFilter: conserva 1 de cada 2 puntos.
+```java
+@Component
+@Profile("undersampling")
+public class UndersamplingFilter implements BlueprintsFilter {
+    @Override
+    public Blueprint apply(Blueprint bp) {
+        List<Point> in = bp.getPoints();
+        if (in.size() <= 2) return bp; // Preserva blueprints pequeños
+        
+        List<Point> out = new ArrayList<>();
+        for (int i = 0; i < in.size(); i++) {
+            if (i % 2 == 0) out.add(in.get(i)); // Solo indices pares
+        }
+        
+        return new Blueprint(bp.getAuthor(), bp.getName(), out);
+    }
+}
+```
+
+## Integracion en el servicio:
+El filtro se inyecta automáticamente por constructor:
+```java
+@Service
+public class BlueprintsServices {
+    private final BlueprintPersistence persistence;
+    private final BlueprintsFilter filter; 
+
+    public BlueprintsServices(BlueprintPersistence persistence, BlueprintsFilter filter) {
+        this.persistence = persistence;
+        this.filter = filter;
+    }
+
+    public Blueprint getBlueprint(String author, String name) 
+            throws BlueprintNotFoundException {
+        // Aplica el filtro antes de devolver
+        return filter.apply(persistence.getBlueprint(author, name));
+    }
+}
+```
+- En la implemetacion actual el filtro solo se aplica en las consultas individuales `getBlueprint()`, no en las demas `getAllBlueprints()` y `getBlueprintsByAuthor`
+
+### Activa los filtros mediante perfiles de Spring (redundancy, undersampling).
+
+En el archivo de `application.properties`
+```properties
+# Sin filtro (por defecto)
+# No especificar nada o dejar comentado
+
+# Filtro de redundancia
+spring.profiles.active=redundancy
+
+# Filtro de undersampling  
+# spring.profiles.active=undersampling
+```
+### Prueba de filtros:
+
+- Creacion de un bp con puntos duplicados
+![alt text](img/bp.png)
+
+- Sin filtro:
+![alt text](img/sinfiltro.png)
+
+- Con RedudancyFilter:
+![alt text](img/redundancy.png)
+
+- Con UndersamplinFilter:
+![alt text](img/undersampling.png)
